@@ -1,0 +1,33 @@
+name: meteora-monitor
+# Репо bagstreet/radar (PUBLIC). Путь: .github/workflows/meteora.yml
+on:
+  schedule:
+    - cron: "10-59/15 * * * *"   # :10/:25/:40/:55 (смещено от funding-репо)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: meteora
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install requests
+      - name: run meteora monitor
+        env: { YIELD_STATE_DIR: "${{ github.workspace }}/state" }
+        run: |
+          mkdir -p state
+          python meteora_monitor.py --once || true
+      - name: commit logs
+        run: |
+          git config user.name  "radar-bot"
+          git config user.email "radar-bot@users.noreply.github.com"
+          git add state/ || true
+          git commit -m "meteora $(date -u +%FT%TZ)" || echo "nothing"
+          git pull --rebase --autostash || true
+          git push || true

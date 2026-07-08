@@ -1,0 +1,33 @@
+name: lst-redemption-monitor
+# Репо bagstreet/radar (PUBLIC). Путь: .github/workflows/lst.yml
+on:
+  schedule:
+    - cron: "13-59/15 * * * *"   # :13/:28/:43/:58 (на 3 мин позже meteora, чтобы не было гонки push)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: lst
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install requests
+      - name: run lst redemption monitor
+        env: { YIELD_STATE_DIR: "${{ github.workspace }}/state" }
+        run: |
+          mkdir -p state
+          python lst_redemption_monitor.py --once || true
+      - name: commit logs
+        run: |
+          git config user.name  "radar-bot"
+          git config user.email "radar-bot@users.noreply.github.com"
+          git add state/ || true
+          git commit -m "lst $(date -u +%FT%TZ)" || echo "nothing"
+          git pull --rebase --autostash || true
+          git push || true
